@@ -64,6 +64,8 @@
 
   function show(el) { el.classList.add('is-in'); }
 
+  var revealObserver = null;
+
   if (!reduceMotion && 'IntersectionObserver' in window) {
     var io = new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) {
@@ -73,6 +75,7 @@
       });
     }, { rootMargin: '0px 0px -10% 0px', threshold: 0 });
 
+    revealObserver = io;
     revealTargets.forEach(function (el) { io.observe(el); });
 
     // Items already on screen at load animate in sequence, not abruptly.
@@ -203,31 +206,40 @@
   }
 
   /* ---------------------------------------------------------------
-     Work filters
+     Work grid - static markup in index.html
+     Cards already exist in the page, so JS only handles filter + lightbox.
      --------------------------------------------------------------- */
-  var filters = document.querySelectorAll('.filter');
-  var cards = document.querySelectorAll('#grid .card');
+  var grid = document.getElementById('grid');
 
-  filters.forEach(function (btn) {
+  /* ---------------------------------------------------------------
+     Work filters (delegated, so they work on rendered cards)
+     --------------------------------------------------------------- */
+  var currentFilter = 'all';
+
+  function applyFilter(cat) {
+    currentFilter = cat;
+    if (!grid) return;
+
+    var cards = grid.querySelectorAll('.card');
+    cards.forEach(function (card) {
+      var show = cat === 'all' || card.getAttribute('data-cat') === cat;
+      card.hidden = !show;
+      if (show) {
+        card.classList.remove('is-in');
+        void card.offsetWidth;
+        card.classList.add('is-in');
+      }
+    });
+  }
+
+  document.querySelectorAll('.filter').forEach(function (btn) {
     btn.addEventListener('click', function () {
-      var cat = btn.getAttribute('data-filter');
-
-      filters.forEach(function (b) {
+      document.querySelectorAll('.filter').forEach(function (b) {
         var active = b === btn;
         b.classList.toggle('is-active', active);
         b.setAttribute('aria-selected', String(active));
       });
-
-      cards.forEach(function (card) {
-        var show = cat === 'all' || card.getAttribute('data-cat') === cat;
-        card.hidden = !show;
-        if (show) {
-          card.classList.remove('is-in');
-          // force reflow so the reveal transition replays
-          void card.offsetWidth;
-          card.classList.add('is-in');
-        }
-      });
+      applyFilter(btn.getAttribute('data-filter'));
     });
   });
 
@@ -291,17 +303,22 @@
     if (lastFocus && typeof lastFocus.focus === 'function') lastFocus.focus();
   }
 
-  cards.forEach(function (card) {
-    card.addEventListener('click', function () {
+  // Delegated: cards are rendered after load, so bind on the container.
+  if (grid) {
+    grid.addEventListener('click', function (e) {
+      var card = e.target.closest('.card');
+      if (!card) return;
+
       openLightbox({
         type: card.getAttribute('data-type'),
         src: card.getAttribute('data-src'),
         title: card.getAttribute('data-title'),
         desc: card.getAttribute('data-desc'),
-        meta: card.getAttribute('data-meta')
+        meta: card.getAttribute('data-meta'),
+        poster: card.querySelector('img') ? card.querySelector('img').src : ''
       });
     });
-  });
+  }
 
   var featuredBtn = document.querySelector('[data-open="featured-video"]');
   if (featuredBtn) {
