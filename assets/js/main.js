@@ -488,4 +488,79 @@
     });
   }
 
+  /* ---------------------------------------------------------------
+     Background music
+     Browsers refuse audio without a gesture, so the button is the
+     only thing that starts it. Volume is kept low on purpose: it is
+     a bed, not the main event.
+     --------------------------------------------------------------- */
+  var music = document.getElementById('bg-music');
+  var soundBtn = document.getElementById('sound-toggle');
+  var musicOn = false;
+
+  if (music && soundBtn) {
+    var soundLabel = soundBtn.querySelector('.sound-label');
+    var TARGET_VOLUME = 0.35;
+    var FADE_MS = 900;
+    var fadeTimer = null;
+
+    music.volume = 0;
+
+    function setBtnState(on) {
+      musicOn = on;
+      soundBtn.setAttribute('aria-pressed', String(on));
+      soundBtn.setAttribute('aria-label', on ? 'Matikan musik latar' : 'Nyalakan musik latar');
+      if (soundLabel) soundLabel.textContent = on ? 'Matikan musik' : 'Nyalakan musik';
+    }
+
+    function fadeTo(target, done) {
+      window.clearInterval(fadeTimer);
+      var steps = Math.max(1, Math.round(FADE_MS / 40));
+      var start = music.volume;
+      var i = 0;
+
+      fadeTimer = window.setInterval(function () {
+        i++;
+        var v = start + (target - start) * (i / steps);
+        music.volume = Math.min(1, Math.max(0, v));
+        if (i >= steps) {
+          window.clearInterval(fadeTimer);
+          music.volume = target;
+          if (done) done();
+        }
+      }, 40);
+    }
+
+    soundBtn.addEventListener('click', function () {
+      if (musicOn) {
+        setBtnState(false);
+        fadeTo(0, function () { music.pause(); });
+        return;
+      }
+
+      var playing = music.play();
+      if (playing && typeof playing.then === 'function') {
+        playing.then(function () {
+          setBtnState(true);
+          fadeTo(TARGET_VOLUME);
+        }).catch(function () {
+          setBtnState(false);
+        });
+      } else {
+        setBtnState(true);
+        fadeTo(TARGET_VOLUME);
+      }
+    });
+
+    // Stop cleanly when the tab is hidden so it does not play in the
+    // background of another app, and pick up again on return.
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden && musicOn) {
+        music.pause();
+      } else if (!document.hidden && musicOn) {
+        music.play().catch(function () {});
+      }
+    });
+  }
+
 })();
